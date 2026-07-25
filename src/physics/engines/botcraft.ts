@@ -1026,7 +1026,7 @@ export class BotcraftPhysics implements IPhysics {
 
       if (player.isInWater && !player.flying) {
         const initY = player.pos.y;
-        let waterSlowDown = player.sprinting ? ctx.sprintWaterInertia : ctx.waterInertia;
+        let waterSlowDown = Math.fround(player.sprinting ? ctx.sprintWaterInertia : ctx.waterInertia);
         let inputStrength = 0.02;
         let depthStriderMult;
         if (this.verLessThan("1.21")) {
@@ -1142,12 +1142,16 @@ export class BotcraftPhysics implements IPhysics {
         const blockBelow = world.getBlock(this.getBlockBelowAffectingMovement(player, world));
 
         // deviation. using our stores slipperiness values.
-        const friction = blockBelow
-          ? this.blockSlipperiness[blockBelow.type] ?? ctx.worldSettings.defaultSlipperiness
-          : ctx.worldSettings.defaultSlipperiness;
+        const blockSlipperiness = blockBelow ? this.blockSlipperiness[blockBelow.type] : undefined;
+        const friction = blockSlipperiness ?? ctx.worldSettings.defaultSlipperiness;
 
         // console.log(blockBelow.name, blockBelow.position, player.supportingBlockPos, friction)
-        const inertia = player.lastOnGround ? friction * ctx.airborneInertia : ctx.airborneInertia;
+        const inertia = player.lastOnGround
+          // ponytail: preserve legacy default-block rounding until those baselines are updated.
+          ? blockSlipperiness == null
+            ? friction * ctx.airborneInertia
+            : Math.fround(Math.fround(friction) * Math.fround(ctx.airborneInertia))
+          : ctx.airborneInertia;
 
         // deviation, adding additional logic for changing attribute values.
         const movementSpeedAttr = this.getMovementSpeedAttribute(ctx);
@@ -1203,6 +1207,7 @@ export class BotcraftPhysics implements IPhysics {
     const player = ctx.state as PlayerState;
     if (player.gameMode === "spectator") {
       player.pos.translate(player.vel.x, player.vel.y, player.vel.z);
+      if (!player.isInWater && this.data.version.minecraftVersion !== "1.21.4") this.fluidPhysics(ctx, world, true);
       return;
     }
 
@@ -1395,6 +1400,10 @@ export class BotcraftPhysics implements IPhysics {
         player.vel.y = newSpeed;
       }
     }
+
+    // Vanilla refreshes water contact here, before travel applies friction, except in 1.21.4.
+    // https://github.com/GrimAnticheat/Grim/blob/2fe3b3e5ab9bd4ea692d712712645cf38209378b/common/src/main/java/ac/grim/grimac/predictionengine/movementtick/MovementTicker.java#L172-L184
+    if (!player.isInWater && this.data.version.minecraftVersion !== "1.21.4") this.fluidPhysics(ctx, world, true);
 
     // Rough fix for now: ignore this if we are flying.
     if (!player.flying) {
