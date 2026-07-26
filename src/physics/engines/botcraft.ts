@@ -1295,7 +1295,7 @@ export class BotcraftPhysics implements IPhysics {
           const adjustedStepUp = this.collideBoundingBox(
             world,
 
-            playerAABB.translateVec(stepOnlyMovement),
+            playerAABB.move(stepOnlyMovement),
             new Vec3(movement.x, 0, movement.z),
           ).add(stepOnlyMovement);
 
@@ -1308,7 +1308,7 @@ export class BotcraftPhysics implements IPhysics {
           newMovement = stepUpMovement.add(
             this.collideBoundingBox(
               world,
-              playerAABB.translateVec(stepUpMovement),
+              playerAABB.move(stepUpMovement),
               new Vec3(0, -stepUpMovement.y + movement.y, 0),
             )
           );
