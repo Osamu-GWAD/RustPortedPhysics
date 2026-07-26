@@ -17,7 +17,7 @@
     "types": "dist/index.d.ts",
     "scripts": {
         "lint": "eslint . --ext .ts,.tsx",
-        "build": "npx tsc",
+        "build": "tsc",
         "prepublishOnly": "npm run build",
         "test": "mocha --require ts-node/register --recursive tests/**/*.test.ts"
     },
