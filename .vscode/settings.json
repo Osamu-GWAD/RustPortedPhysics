@@ -1,5 +1,6 @@
 {
     "print.colourScheme": "GitHub",
     "ecl.launchConfiguration": "not found",
-    "ecl.targetCluster": {}
+    "ecl.targetCluster": {},
+    "js/ts.experimental.useTsgo": false
 }

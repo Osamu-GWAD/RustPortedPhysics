@@ -3,7 +3,7 @@ import { EPhysicsCtx } from "../physics/settings";
 import { AABB } from "@nxg-org/mineflayer-util-plugin";
 import features from "../physics/info/features.json";
 import md from "minecraft-data";
-import { ControlStateHandler, EntityState, IEntityState, PlayerState } from "../physics/states";
+import { ControlStateHandler, PlayerState } from "../physics/states";
 import { Vec3 } from "vec3";
 import { IPhysics } from "../physics/engines";
 import { Bot } from "mineflayer";
