@@ -9,6 +9,7 @@ import { EntityState, IEntityState } from "../states";
 import { playerPoseCtx, PlayerPoses } from "../states/poses";
 
 import info from "../info/entity_physics.json";
+import { BoatPhysicsSettings, resolveBoatSettings } from "./boatSettings";
 import { PhysicsWorldSettings } from "./physicsSettings";
 import { getPose, PlayerState } from "../states";
 
@@ -19,6 +20,7 @@ function isBoatLikeEntity(entityType: md.Entity): boolean {
 
 function applyBoatVehiclePhysics(ctx: EPhysicsCtx): void {
     Object.assign(ctx, info.dead_vehicles.default, info.dead_vehicles.boat);
+    ctx.boat = resolveBoatSettings(ctx.ctx.data);
 }
 
 
@@ -68,6 +70,8 @@ export class EPhysicsCtx<State extends IEntityState=IEntityState> {
         blockEffects: false,
         affectedAfterCollision: true,
     };
+
+    public boat?: BoatPhysicsSettings;
 
     public get position(): Vec3 {
         return this.state.pos

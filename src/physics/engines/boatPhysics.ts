@@ -3,6 +3,7 @@ import md from "minecraft-data";
 import { Block } from "prismarine-block";
 import { Vec3 } from "vec3";
 import { EPhysicsCtx } from "../settings/entityPhysicsCtx";
+import { BoatPhysicsSettings, resolveBoatSettings } from "../settings/boatSettings";
 import { BoatState, BoatStatus } from "../states/boatState";
 import { IEntityState } from "../states";
 import { EntityPhysics } from "./entityPhysics";
@@ -11,16 +12,12 @@ type PhysicsWorld = {
   getBlock(pos: Vec3): Block | null | undefined;
 };
 
-const GRAVITY = Math.fround(0.04);
-const BUOYANCY_UNDER_WATER = Math.fround(0.01);
-const FLOWING_WATER_VERTICAL = Math.fround(-0.0007);
-const ROTATION_PER_TICK = Math.PI / 180;
-const DEFAULT_BLOCK_FRICTION = 0.6;
-const MAX_CONTROL_ACCELERATION = Math.fround(0.04);
-
 export class BoatPhysics extends EntityPhysics {
+  private readonly boatSettings: BoatPhysicsSettings;
+
   constructor(mcData: md.IndexedData) {
     super(mcData);
+    this.boatSettings = resolveBoatSettings(mcData);
   }
 
   simulate(simCtx: EPhysicsCtx, world: PhysicsWorld): IEntityState {
@@ -36,10 +33,11 @@ export class BoatPhysics extends EntityPhysics {
 
     state.worldReady = true;
 
+    const cfg = simCtx.boat ?? this.boatSettings;
     state.previousStatus = state.status;
-    state.status = this.getStatus(simCtx, state, world);
-    this.floatBoat(simCtx, state, world);
-    this.controlBoat(state);
+    state.status = this.getStatus(simCtx, state, world, cfg);
+    this.floatBoat(simCtx, state, world, cfg);
+    this.controlBoat(state, cfg);
     state.lastVerticalVelocity = state.vel.y;
 
     this.moveEntity(simCtx, state.vel.x, state.vel.y, state.vel.z, world);
@@ -105,7 +103,12 @@ export class BoatPhysics extends EntityPhysics {
     return true;
   }
 
-  private getStatus(simCtx: EPhysicsCtx, state: BoatState, world: PhysicsWorld): BoatStatus {
+  private getStatus(
+    simCtx: EPhysicsCtx,
+    state: BoatState,
+    world: PhysicsWorld,
+    cfg: BoatPhysicsSettings,
+  ): BoatStatus {
     const bb = this.getBoatBB(simCtx, state);
     const underwater = this.isUnderwater(bb, world);
     if (underwater != null) {
@@ -115,7 +118,7 @@ export class BoatPhysics extends EntityPhysics {
     if (this.checkInWater(bb, state, world)) {
       return BoatStatus.IN_WATER;
     }
-    const groundFriction = this.getGroundFriction(bb, world);
+    const groundFriction = this.getGroundFriction(bb, world, cfg);
     if (groundFriction > 0) {
       state.landFriction = groundFriction;
       return BoatStatus.ON_LAND;
@@ -209,7 +212,7 @@ export class BoatPhysics extends EntityPhysics {
     return maxY + 1;
   }
 
-  private getGroundFriction(bb: AABB, world: PhysicsWorld): number {
+  private getGroundFriction(bb: AABB, world: PhysicsWorld, cfg: BoatPhysicsSettings): number {
     const groundBB = new AABB(bb.minX, bb.minY - 0.001, bb.minZ, bb.maxX, bb.minY, bb.maxZ);
     const minX = Math.floor(groundBB.minX) - 1;
     const maxX = Math.ceil(groundBB.maxX) + 1;
@@ -239,7 +242,7 @@ export class BoatPhysics extends EntityPhysics {
               const blockBB = new AABB(shape[0], shape[1], shape[2], shape[3], shape[4], shape[5]);
               blockBB.translate(cursor.x, cursor.y, cursor.z);
               if (blockBB.intersects(groundBB)) {
-                frictionSum += this.blockSlipperiness[block.type] ?? DEFAULT_BLOCK_FRICTION;
+                frictionSum += this.blockSlipperiness[block.type] ?? cfg.defaultBlockFriction;
                 count++;
               }
             }
@@ -288,10 +291,15 @@ export class BoatPhysics extends EntityPhysics {
     return 0;
   }
 
-  private floatBoat(simCtx: EPhysicsCtx, state: BoatState, world: PhysicsWorld): void {
-    let gravity = -GRAVITY;
+  private floatBoat(
+    simCtx: EPhysicsCtx,
+    state: BoatState,
+    world: PhysicsWorld,
+    cfg: BoatPhysicsSettings,
+  ): void {
+    let gravity = -cfg.gravity;
     let buoyancy = 0;
-    let invFriction = Math.fround(0.05);
+    let invFriction = cfg.fallbackInvFriction;
 
     if (
       state.previousStatus === BoatStatus.IN_AIR &&
@@ -301,7 +309,7 @@ export class BoatPhysics extends EntityPhysics {
       const bb = this.getBoatBB(simCtx, state);
       state.waterLevel = bb.maxY;
       const waterLevelAbove = this.getWaterLevelAbove(bb, state.lastVerticalVelocity, world);
-      const targetY = waterLevelAbove - state.height + 0.101;
+      const targetY = waterLevelAbove - state.height + cfg.waterEntryYOffset;
       const useCollisionGuard = this.supportFeature("boatWaterEntryCollisionGuard");
       const targetPos = { x: state.pos.x, y: targetY, z: state.pos.z };
       const targetBB = this.getEntityBB(simCtx, targetPos);
@@ -321,23 +329,23 @@ export class BoatPhysics extends EntityPhysics {
     switch (state.status) {
       case BoatStatus.IN_WATER:
         buoyancy = (state.waterLevel - state.pos.y) / state.height;
-        invFriction = Math.fround(0.9);
+        invFriction = cfg.inWaterInvFriction;
         break;
       case BoatStatus.UNDER_FLOWING_WATER:
-        gravity = FLOWING_WATER_VERTICAL;
-        invFriction = Math.fround(0.9);
+        gravity = cfg.flowingWaterVerticalAccel;
+        invFriction = cfg.underFlowingWaterInvFriction;
         break;
       case BoatStatus.UNDER_WATER:
-        buoyancy = BUOYANCY_UNDER_WATER;
-        invFriction = Math.fround(0.45);
+        buoyancy = cfg.buoyancyUnderWater;
+        invFriction = cfg.underWaterInvFriction;
         break;
       case BoatStatus.IN_AIR:
-        invFriction = Math.fround(0.9);
+        invFriction = cfg.inAirInvFriction;
         break;
       case BoatStatus.ON_LAND:
         invFriction = state.landFriction;
         if (state.controllingPlayer) {
-          state.landFriction /= 2;
+          state.landFriction /= cfg.controlledLandFrictionDivisor;
         }
         break;
     }
@@ -348,31 +356,33 @@ export class BoatPhysics extends EntityPhysics {
     state.yawVelocity = Math.fround(state.yawVelocity * invFriction);
 
     if (buoyancy > 0) {
-      state.vel.y = Math.fround((state.vel.y + buoyancy * (GRAVITY / 0.65)) * 0.75);
+      state.vel.y = Math.fround(
+        (state.vel.y + buoyancy * (cfg.gravity / cfg.buoyancyGravityDivisor)) * cfg.buoyancyDamping,
+      );
     }
   }
 
-  private controlBoat(state: BoatState): void {
+  private controlBoat(state: BoatState, cfg: BoatPhysicsSettings): void {
     const control = state.control;
     let acceleration = 0;
 
     if (control.left) {
-      state.yawVelocity += ROTATION_PER_TICK;
+      state.yawVelocity += cfg.rotationPerTick;
     }
     if (control.right) {
-      state.yawVelocity -= ROTATION_PER_TICK;
+      state.yawVelocity -= cfg.rotationPerTick;
     }
     if (control.right !== control.left && !control.forward && !control.back) {
-      acceleration += Math.fround(0.005);
+      acceleration += cfg.turnOnlyAcceleration;
     }
 
     state.yaw += state.yawVelocity;
 
     if (control.forward) {
-      acceleration += MAX_CONTROL_ACCELERATION;
+      acceleration += cfg.forwardAcceleration;
     }
     if (control.back) {
-      acceleration -= Math.fround(0.005);
+      acceleration -= cfg.backwardAcceleration;
     }
 
     if (acceleration !== 0) {

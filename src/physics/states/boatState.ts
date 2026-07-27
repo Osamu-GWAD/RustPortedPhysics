@@ -1,6 +1,7 @@
 import type { Entity } from "prismarine-entity";
 import { Vec3 } from "vec3";
 import type { IPhysics } from "../engines";
+import { resolveBoatDimensions } from "../settings/boatSettings";
 import { ControlStateHandler } from "../player/playerControls";
 import { EntityState } from "./entityState";
 
@@ -43,10 +44,11 @@ export class BoatState extends EntityState {
     entity: Entity,
     control: ControlStateHandler = ControlStateHandler.DEFAULT(),
   ): BoatState {
+    const dims = resolveBoatDimensions(ctx.data, entity.name);
     return new BoatState(
       ctx,
-      entity.height ?? 0.5625,
-      (entity.width ?? 1.375) / 2,
+      entity.height ?? dims.height,
+      (entity.width ?? dims.width) / 2,
       entity.position.clone(),
       entity.velocity.clone(),
       entity.onGround ?? false,
