@@ -87,9 +87,34 @@
             }
         },
         "boat": {
-            "gravity": 0.04,
             "airdrag": 1
         }
+    },
+    "boats": {
+        "default": {
+            "gravity": 0.04,
+            "buoyancyUnderWater": 0.01,
+            "flowingWaterVerticalAccel": -0.0007,
+            "rotationPerTick": 0.017453292519943295,
+            "defaultBlockFriction": 0.6,
+            "forwardAcceleration": 0.04,
+            "backwardAcceleration": 0.005,
+            "turnOnlyAcceleration": 0.005,
+            "fallbackInvFriction": 0.05,
+            "inWaterInvFriction": 0.9,
+            "underFlowingWaterInvFriction": 0.9,
+            "underWaterInvFriction": 0.45,
+            "inAirInvFriction": 0.9,
+            "controlledLandFrictionDivisor": 2,
+            "buoyancyGravityDivisor": 0.65,
+            "buoyancyDamping": 0.75,
+            "waterEntryYOffset": 0.101
+        },
+        "fallbackDimensions": {
+            "height": 0.5625,
+            "width": 1.375
+        },
+        "overrides": []
     },
     "shot_entities": {
         "names": ["fireball", "skull"],
