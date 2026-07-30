@@ -1,7 +1,7 @@
 import { describe, it } from "mocha";
 import expect from "expect";
 import { Vec3 } from "vec3";
-import { resolveHorseSettings } from "../../../src/physics/settings/horseSettings";
+import { resolveHorseSettings, resolveWaterHorizontalSlowDown } from "../../../src/physics/settings/horseSettings";
 import {
   createHorseRig,
   loadMcData,
@@ -225,7 +225,7 @@ describe("HorsePhysics travel context", () => {
       airdrag: cfg.verticalDrag,
       airborneInertia: cfg.groundFrictionMultiplier,
       airborneAccel: Math.fround(0.225) * cfg.airborneAccelFactor,
-      waterInertia: cfg.waterInertia,
+      waterInertia: resolveWaterHorizontalSlowDown(rig171.horseState.species, loadMcData("1.17.1").mcData),
       lavaInertia: cfg.lavaHorizontalInertia,
       liquidAccel: cfg.liquidAccel,
       stepHeight: cfg.stepHeight,

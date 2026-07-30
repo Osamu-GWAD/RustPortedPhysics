@@ -103,7 +103,8 @@
             "gravity": 0.08,
             "airborneInertia": 0.91,
             "airborneAccelFactor": 0.1,
-            "waterInertia": 0.8,
+            "liquidVerticalInertia": 0.8,
+            "waterHorizontalSlowDown": 0.8,
             "liquidAccel": 0.02,
             "groundFrictionMultiplier": 0.91,
             "frictionInfluencedSpeedFactor": 0.21600002,
@@ -115,6 +116,11 @@
         "fallbackDimensions": {
             "height": 1.6,
             "width": 1.3964844
+        },
+        "speciesOverrides": {
+            "skeleton_horse": {
+                "waterHorizontalSlowDown": 0.96
+            }
         },
         "overrides": []
     },

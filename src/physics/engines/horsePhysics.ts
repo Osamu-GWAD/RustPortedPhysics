@@ -3,7 +3,7 @@ import md from "minecraft-data";
 import { Block } from "prismarine-block";
 import { Vec3 } from "vec3";
 import { EPhysicsCtx } from "../settings/entityPhysicsCtx";
-import { HorsePhysicsSettings, resolveHorseSettings, computeHorseJumpPower } from "../settings/horseSettings";
+import { HorsePhysicsSettings, resolveHorseSettings, computeHorseJumpPower, resolveWaterHorizontalSlowDown } from "../settings/horseSettings";
 import { getHorseBlockBelowAffectingMovementPos } from "../settings/horseBlockSupport";
 import { HorseState } from "../states/horseState";
 import { IEntityState } from "../states";
@@ -128,7 +128,7 @@ export class HorsePhysics extends EntityPhysics {
     simCtx.airdrag = cfg.verticalDrag;
     simCtx.airborneInertia = cfg.groundFrictionMultiplier;
     simCtx.airborneAccel = state.movementSpeed * cfg.airborneAccelFactor;
-    simCtx.waterInertia = cfg.waterInertia;
+    simCtx.waterInertia = resolveWaterHorizontalSlowDown(state.species, this.data);
     simCtx.lavaInertia = cfg.lavaHorizontalInertia;
     simCtx.liquidAccel = cfg.liquidAccel;
     simCtx.stepHeight = cfg.stepHeight;
@@ -258,10 +258,13 @@ export class HorsePhysics extends EntityPhysics {
     this.applyHorseHeading(simCtx, strafe, forward, cfg.liquidAccel);
     this.moveEntity(simCtx, state.vel.x, state.vel.y, state.vel.z, world);
 
+    const waterHorizontalSlowDown = resolveWaterHorizontalSlowDown(state.species, this.data);
+    const liquidVerticalInertia = cfg.liquidVerticalInertia;
+
     // Vanilla LivingEntity.travel water branch: drag then getFluidFallingAdjustedMovement (gravity/16).
-    state.vel.x *= cfg.waterInertia;
-    state.vel.y = state.vel.y * cfg.waterInertia - simCtx.waterGravity;
-    state.vel.z *= cfg.waterInertia;
+    state.vel.x *= waterHorizontalSlowDown;
+    state.vel.y = state.vel.y * liquidVerticalInertia - simCtx.waterGravity;
+    state.vel.z *= waterHorizontalSlowDown;
 
     this.applyOutOfLiquidImpulse(simCtx, state, world, lastY);
   }
@@ -280,9 +283,10 @@ export class HorsePhysics extends EntityPhysics {
 
     const { fluidHeight } = this.scanLavaFluid(simCtx, state, world);
     const lavaScale = cfg.lavaHorizontalInertia;
+    const liquidVerticalInertia = cfg.liquidVerticalInertia;
     if (fluidHeight <= cfg.lavaShallowThreshold) {
       state.vel.x *= lavaScale;
-      state.vel.y = state.vel.y * cfg.waterInertia - simCtx.waterGravity;
+      state.vel.y = state.vel.y * liquidVerticalInertia - simCtx.waterGravity;
       state.vel.z *= lavaScale;
     } else {
       state.vel.x *= lavaScale;
@@ -371,11 +375,24 @@ export class HorsePhysics extends EntityPhysics {
 
   private applyHorseHeading(simCtx: EPhysicsCtx, strafe: number, forward: number, acceleration: number): void {
     const state = simCtx.state as HorseState;
+    const lengthSqr = strafe * strafe + forward * forward;
+    if (lengthSqr < 1e-7) {
+      return;
+    }
+
+    let normStrafe = strafe;
+    let normForward = forward;
+    if (lengthSqr > 1.0) {
+      const length = Math.sqrt(lengthSqr);
+      normStrafe = strafe / length;
+      normForward = forward / length;
+    }
+
     const yaw = Math.PI - state.yaw;
     const sin = Math.sin(yaw);
     const cos = Math.cos(yaw);
-    const offsetX = strafe * cos - forward * sin;
-    const offsetZ = forward * cos + strafe * sin;
+    const offsetX = normStrafe * cos - normForward * sin;
+    const offsetZ = normForward * cos + normStrafe * sin;
     state.vel.x += offsetX * acceleration;
     state.vel.z += offsetZ * acceleration;
   }

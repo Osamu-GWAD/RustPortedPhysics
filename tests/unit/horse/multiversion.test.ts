@@ -166,6 +166,21 @@ describe("HorsePhysics multiversion compatibility", () => {
               expect(Number.isFinite(rig.horseState.vel.z)).toBe(true);
             }
           });
+
+          if (version === "1.17.1" && entityName === "skeleton_horse") {
+            it("resolves skeleton horse horizontal water slowdown", () => {
+              const { resolveWaterHorizontalSlowDown } = loadHorseSettingsModule();
+              const rig = createHorseRig({
+                version,
+                entityName,
+                position: new Vec3(0, groundY, 0),
+                floorY: groundY - 1,
+              });
+              expect(rig.horseState.species).toBe("skeleton_horse");
+              expect(resolveWaterHorizontalSlowDown("skeleton_horse", rig.mcData)).toBe(Math.fround(0.96));
+              expect(resolveWaterHorizontalSlowDown("horse", rig.mcData)).toBe(Math.fround(0.8));
+            });
+          }
         });
       }
     });

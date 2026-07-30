@@ -127,3 +127,62 @@ describe("HorsePhysics movement", () => {
     expect(iceSpeed).toBeGreaterThan(stoneSpeed);
   });
 });
+
+describe("HorsePhysics diagonal input normalization", () => {
+  it("leaves forward-only acceleration unchanged", () => {
+    const rig = setupGroundHorse();
+    rig.horseState.control.forward = true;
+    simulateHorseTick(rig);
+    expect(rig.horseState.pos.z).toBeCloseTo(-0.22049999309579482, 10);
+    expect(rig.horseState.vel.z).toBeCloseTo(-0.12039300448399745, 10);
+  });
+
+  it("normalizes forward+strafe input like Entity#getInputVector", () => {
+    const forwardRig = setupGroundHorse();
+    forwardRig.horseState.control.forward = true;
+    forwardRig.horseState.vel.set(0, 0, 0);
+    simulateHorseTick(forwardRig);
+    const forwardDelta = Math.hypot(forwardRig.horseState.vel.x, forwardRig.horseState.vel.z);
+
+    const diagRig = setupGroundHorse();
+    diagRig.horseState.control.forward = true;
+    diagRig.horseState.control.left = true;
+    diagRig.horseState.vel.set(0, 0, 0);
+    simulateHorseTick(diagRig);
+    const diagDelta = Math.hypot(diagRig.horseState.vel.x, diagRig.horseState.vel.z);
+
+    const unnormalizedRatio = Math.sqrt(1.2005);
+    expect(diagDelta).toBeGreaterThan(forwardDelta);
+    expect(diagDelta / forwardDelta).toBeCloseTo(1 / 0.98, 5);
+    expect(diagDelta).toBeLessThan(unnormalizedRatio * forwardDelta);
+  });
+
+  it("applies unit-length diagonal acceleration magnitude", () => {
+    const rig = setupGroundHorse();
+    rig.horseState.control.forward = true;
+    rig.horseState.control.left = true;
+    rig.horseState.vel.set(0, 0, 0);
+    simulateHorseTick(rig);
+
+    const groundFriction = 0.6;
+    const horizontalFriction = groundFriction * 0.91;
+    const acceleration =
+      rig.horseState.movementSpeed *
+      (0.21600002 / (groundFriction * groundFriction * groundFriction));
+    const horizVel = Math.hypot(rig.horseState.vel.x, rig.horseState.vel.z);
+
+    expect(horizVel / horizontalFriction).toBeCloseTo(acceleration, 7);
+    expect(horizVel / horizontalFriction).toBeLessThan(Math.sqrt(1.2005) * acceleration);
+  });
+
+  it("does not produce NaN or movement for zero input", () => {
+    const rig = setupGroundHorse();
+    rig.horseState.vel.set(0, 0, 0);
+    simulateHorseTick(rig);
+    expect(Number.isNaN(rig.horseState.vel.x)).toBe(false);
+    expect(Number.isNaN(rig.horseState.vel.y)).toBe(false);
+    expect(Number.isNaN(rig.horseState.vel.z)).toBe(false);
+    expect(rig.horseState.vel.x).toBe(0);
+    expect(rig.horseState.vel.z).toBe(0);
+  });
+});

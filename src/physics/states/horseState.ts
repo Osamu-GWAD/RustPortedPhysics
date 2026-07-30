@@ -9,7 +9,9 @@ import {
   getHorseJumpStrengthAttribute,
   getHorseMovementSpeedAttribute,
   HorsePhysicsSettings,
+  HorseSpecies,
   pickRuntimeDimension,
+  parseHorseSpecies,
   resolveHorseDimensions,
   resolveHorseSettings,
 } from "../settings/horseSettings";
@@ -33,6 +35,7 @@ export class HorseState extends EntityState {
   allowStandSliding = false;
   /** Out of scope for physics engine — saddle gate remains in consumer. */
   saddled = false;
+  species: HorseSpecies = "horse";
 
   worldReady = true;
   attributesReady = false;
@@ -53,9 +56,11 @@ export class HorseState extends EntityState {
     pitch: number,
     control: ControlStateHandler = ControlStateHandler.DEFAULT(),
     settings?: HorsePhysicsSettings,
+    species: HorseSpecies = "horse",
   ) {
     super(ctx, height, halfWidth, pos, vel, onGround, yaw, pitch, control);
     this.settings = settings ?? resolveHorseSettings(ctx.data);
+    this.species = species;
     this.movementSpeed = this.settings.defaultMovementSpeed;
     this.jumpStrength = this.settings.defaultJumpStrength;
   }
@@ -83,6 +88,7 @@ export class HorseState extends EntityState {
       settings,
     );
     state.updateFromHorseEntity(entity);
+    state.species = parseHorseSpecies(entity.name);
     return state;
   }
 
@@ -105,6 +111,9 @@ export class HorseState extends EntityState {
       this.movementSpeed = getHorseMovementSpeedAttribute(entity.attributes, this.ctx.data);
       this.jumpStrength = getHorseJumpStrengthAttribute(entity.attributes, this.ctx.data);
       this.attributesReady = true;
+    }
+    if (entity.name) {
+      this.species = parseHorseSpecies(entity.name);
     }
     return this;
   }
@@ -203,6 +212,7 @@ export class HorseState extends EntityState {
       this.pitch,
       this.control.clone(),
       this.settings,
+      this.species,
     );
     other.movementSpeed = this.movementSpeed;
     other.jumpStrength = this.jumpStrength;
@@ -213,6 +223,7 @@ export class HorseState extends EntityState {
     other.isJumping = this.isJumping;
     other.allowStandSliding = this.allowStandSliding;
     other.saddled = this.saddled;
+    other.species = this.species;
     other.worldReady = this.worldReady;
     other.attributesReady = this.attributesReady;
     other.riderYaw = this.riderYaw;

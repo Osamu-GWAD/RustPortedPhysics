@@ -22,7 +22,8 @@ import info from "../info/entity_physics.json";
  * | defaultBlockFriction          | 0.6F               | settings             |
  * | verticalDrag                  | 0.98F              | settings             |
  * | airborneInertia               | 0.91F              | settings             |
- * | waterInertia                  | 0.8F               | settings             |
+ * | liquidVerticalInertia         | 0.8F               | settings             |
+ * | waterHorizontalSlowDown       | 0.8F               | settings             |
  * | liquidAccel                   | 0.02F              | settings             |
  * | lavaHorizontalInertia         | 0.5F               | settings             |
  * | gravity                       | 0.08D              | never                |
@@ -71,8 +72,10 @@ export interface HorsePhysicsSettings {
   airborneInertia: number;
   /** Scoped LivingEntity travel profile — air acceleration factor (* movementSpeed, 0.1F). */
   airborneAccelFactor: number;
-  /** Scoped LivingEntity travel profile — water/lava shallow Y drag (0.8F). */
-  waterInertia: number;
+  /** Scoped LivingEntity travel profile — water Y and shallow-lava Y drag (0.8F). */
+  liquidVerticalInertia: number;
+  /** LivingEntity#getWaterSlowDown horizontal scale for water X/Z (0.8F; skeleton horse 0.96F). */
+  waterHorizontalSlowDown: number;
   /** Scoped LivingEntity travel profile — liquid input acceleration (0.02F). */
   liquidAccel: number;
   /** Scoped LivingEntity travel profile — getFluidJumpThreshold when eyeHeight > 0.4 (double). */
@@ -86,9 +89,16 @@ export interface HorseDimensions {
   width: number;
 }
 
+export type HorseSpecies = "horse" | "skeleton_horse" | "zombie_horse" | "donkey" | "mule";
+
+export interface HorseSpeciesOverride {
+  waterHorizontalSlowDown?: number;
+}
+
 export interface HorseSettingsSection {
   default: HorsePhysicsSettings;
   fallbackDimensions: HorseDimensions;
+  speciesOverrides?: Partial<Record<HorseSpecies, HorseSpeciesOverride>>;
   overrides: Array<{ versions: string[]; values: Partial<HorsePhysicsSettings> }>;
 }
 
@@ -107,7 +117,8 @@ export const FLOAT32_FIELDS = [
   "defaultBlockFriction",
   "verticalDrag",
   "airborneInertia",
-  "waterInertia",
+  "liquidVerticalInertia",
+  "waterHorizontalSlowDown",
   "liquidAccel",
   "lavaHorizontalInertia",
 ] as const;
@@ -115,6 +126,27 @@ export const FLOAT32_FIELDS = [
 const horseSection = info.horses as unknown as HorseSettingsSection;
 
 const HORSE_ENTITY_NAMES = ["horse", "skeleton_horse", "zombie_horse", "donkey", "mule"] as const;
+
+export function parseHorseSpecies(entityName?: string): HorseSpecies {
+  if (entityName === "skeleton_horse" || entityName === "zombie_horse" || entityName === "donkey" || entityName === "mule") {
+    return entityName;
+  }
+  return "horse";
+}
+
+/** Species-aware horizontal water slowdown (SkeletonHorse#getWaterSlowDown). */
+export function resolveWaterHorizontalSlowDown(
+  species: HorseSpecies,
+  mcData: md.IndexedData,
+  section: HorseSettingsSection = horseSection,
+): number {
+  const settings = resolveHorseSettingsFromSection(mcData, section);
+  const override = section.speciesOverrides?.[species]?.waterHorizontalSlowDown;
+  if (override != null) {
+    return Math.fround(override);
+  }
+  return settings.waterHorizontalSlowDown;
+}
 
 const MOVEMENT_SPEED_ALIASES = [
   "generic.movementSpeed",

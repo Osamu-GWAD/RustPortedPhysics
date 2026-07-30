@@ -43,7 +43,8 @@ function setupLavaPool(horseY: number) {
 /** End-of-tick jump Y: executeRidersJump then air travel with float verticalDrag (1.17.1). */
 const VANILLA_JUMP_END_VEL_Y = (0.7 - 0.08) * Math.fround(0.98);
 const VANILLA_AIR_DROP_VEL_Y = (0 - 0.08) * Math.fround(0.98);
-const VANILLA_WATER_INERTIA = Math.fround(0.8);
+const VANILLA_WATER_VERTICAL_INERTIA = Math.fround(0.8);
+const VANILLA_SKELETON_WATER_HORIZONTAL = Math.fround(0.96);
 
 describe("HorsePhysics jump", () => {
   it("starts at zero and charges linearly through the tenth held tick", () => {
@@ -152,6 +153,20 @@ describe("HorsePhysics jump", () => {
     clone.jumpChargeScale = 0.1;
     expect(rig.horseState.jumpChargeScale).toBeCloseTo(0.5, 5);
   });
+
+  it("clone preserves species", () => {
+    const rig = createHorseRig({
+      version,
+      entityName: "skeleton_horse",
+      position: new Vec3(0, groundY, 0),
+      floorY: groundY - 1,
+    });
+    expect(rig.horseState.species).toBe("skeleton_horse");
+    const clone = rig.horseState.clone();
+    expect(clone.species).toBe("skeleton_horse");
+    clone.species = "horse";
+    expect(rig.horseState.species).toBe("skeleton_horse");
+  });
 });
 
 describe("HorseState attributes", () => {
@@ -170,7 +185,25 @@ describe("HorseState attributes", () => {
 });
 
 describe("HorsePhysics travel — water and lava oracle", () => {
-  it("applies drag-then-gravity water branch with float waterInertia", () => {
+  function setupWaterHorse(entityName = "horse") {
+    const waterY = 64;
+    const rig = createHorseRig({
+      version,
+      entityName,
+      position: new Vec3(0, waterY - 0.5, 0),
+      floorY: waterY - 3,
+    });
+    for (let x = -1; x <= 1; x++) {
+      for (let z = -1; z <= 1; z++) {
+        fillWaterColumn(rig.world, x, z, waterY - 1, waterY, 0);
+      }
+    }
+    rig.horseState.vel.set(1.0, 0.5, -0.3);
+    rig.horseState.onGround = false;
+    return rig;
+  }
+
+  it("applies drag-then-gravity water branch with float liquidVerticalInertia", () => {
     const waterY = 64;
     const rig = createHorseRig({
       version,
@@ -189,7 +222,7 @@ describe("HorsePhysics travel — water and lava oracle", () => {
     expect(rig.horseState.vel.y).toBe(-0.005);
   });
 
-  it("applies float waterInertia to non-zero vertical velocity", () => {
+  it("applies float liquidVerticalInertia to non-zero vertical velocity", () => {
     const waterY = 64;
     const rig = createHorseRig({
       version,
@@ -204,7 +237,35 @@ describe("HorsePhysics travel — water and lava oracle", () => {
     rig.horseState.vel.set(0, 0.5, 0);
     rig.horseState.onGround = false;
     simulateHorseTick(rig);
-    expect(rig.horseState.vel.y).toBe(0.5 * VANILLA_WATER_INERTIA - 0.005);
+    expect(rig.horseState.vel.y).toBe(0.5 * VANILLA_WATER_VERTICAL_INERTIA - 0.005);
+  });
+
+  it("applies species-specific horizontal water slowdown for skeleton horse", () => {
+    const rig = setupWaterHorse("skeleton_horse");
+    simulateHorseTick(rig);
+    expect(rig.horseState.species).toBe("skeleton_horse");
+    expect(rig.horseState.vel.x).toBe(1.0 * VANILLA_SKELETON_WATER_HORIZONTAL);
+    expect(rig.horseState.vel.y).toBe(0.5 * VANILLA_WATER_VERTICAL_INERTIA - 0.005);
+    expect(rig.horseState.vel.z).toBe(-0.3 * VANILLA_SKELETON_WATER_HORIZONTAL);
+  });
+
+  it("applies default horizontal water slowdown for ordinary horse", () => {
+    const rig = setupWaterHorse("horse");
+    simulateHorseTick(rig);
+    expect(rig.horseState.vel.x).toBe(1.0 * VANILLA_WATER_VERTICAL_INERTIA);
+    expect(rig.horseState.vel.y).toBe(0.5 * VANILLA_WATER_VERTICAL_INERTIA - 0.005);
+    expect(rig.horseState.vel.z).toBe(-0.3 * VANILLA_WATER_VERTICAL_INERTIA);
+  });
+
+  it("uses liquidVerticalInertia for skeleton horse shallow lava Y drag", () => {
+    const rig = setupLavaPool(63.85);
+    rig.horseState.species = "skeleton_horse";
+    rig.horseState.vel.set(1.0, 0.5, -0.3);
+    simulateHorseTick(rig);
+    expect(rig.horseState.isInLava).toBe(true);
+    expect(rig.horseState.vel.x).toBe(0.5);
+    expect(rig.horseState.vel.y).toBe(0.5 * VANILLA_WATER_VERTICAL_INERTIA - 0.005 - 0.02);
+    expect(rig.horseState.vel.z).toBe(-0.15);
   });
 
   it("detects lava when feet are below source surface (y≈63.85)", () => {

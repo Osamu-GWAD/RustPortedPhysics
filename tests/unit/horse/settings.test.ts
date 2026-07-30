@@ -38,7 +38,8 @@ describe("Horse settings resolution", () => {
     expect(resolved.defaultJumpStrength).toBe(defaultSettings.defaultJumpStrength);
     expect(resolved.defaultJumpStrength).toBe(0.7);
     expect(resolved.verticalDrag).toBe(Math.fround(defaultSettings.verticalDrag));
-    expect(resolved.waterInertia).toBe(Math.fround(defaultSettings.waterInertia));
+    expect(resolved.liquidVerticalInertia).toBe(Math.fround(defaultSettings.liquidVerticalInertia));
+    expect(resolved.waterHorizontalSlowDown).toBe(Math.fround(defaultSettings.waterHorizontalSlowDown));
     expect(resolved.lavaShallowThreshold).toBe(defaultSettings.lavaShallowThreshold);
   });
 
@@ -90,6 +91,14 @@ describe("Horse settings resolution", () => {
 
     const resolved = resolveHorseSettingsFromSection(mcData, testSection);
     expect(resolved.defaultMovementSpeed).toBe(Math.fround(0.2));
+  });
+
+  it("resolves skeleton horse horizontal water slowdown via speciesOverrides", () => {
+    const { resolveWaterHorizontalSlowDown } = loadHorseSettingsModule();
+    const { mcData } = loadMcData("1.17.1");
+    expect(resolveWaterHorizontalSlowDown("horse", mcData)).toBe(Math.fround(0.8));
+    expect(resolveWaterHorizontalSlowDown("skeleton_horse", mcData)).toBe(Math.fround(0.96));
+    expect(resolveWaterHorizontalSlowDown("donkey", mcData)).toBe(Math.fround(0.8));
   });
 });
 
