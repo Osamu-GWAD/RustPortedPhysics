@@ -8,10 +8,10 @@ import { ControlStateHandler } from "../player/playerControls";
 import { PlayerState } from "./playerState";
 import { PlayerPoses } from "./poses";
 
-import { IPhysics } from "../engines";
+import { IPhysics } from "../engines/IPhysics";
 import nbt from "prismarine-nbt";
 import {Entity} from "prismarine-entity";
-import { IEntityState } from ".";
+import { IEntityState } from "./iEntityState";
 
 
 

@@ -15,11 +15,11 @@ import {
 // import { bot.entity } from "prismarine-entity";
 import md from "minecraft-data";
 import { ControlStateHandler } from "../player/playerControls";
-import { IEntityState } from ".";
+import { IEntityState } from "./iEntityState";
 import { IPhysics } from "../engines/IPhysics";
 import type { Entity } from "prismarine-entity";
 import { PlayerPoses, getCollider, playerPoseCtx } from "./poses";
-import { Heading, getPose } from ".";
+import { Heading, getPose } from "./entityPose";
 
 
 export function convInpToAxes(player: PlayerState): Heading {
