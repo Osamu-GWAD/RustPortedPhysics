@@ -192,9 +192,11 @@ export class HorseState extends EntityState {
     entity.pitch = this.pitch;
     entity.onGround = this.onGround;
     const entityExtras = entity as Entity & {
+      headYaw?: number;
       isCollidedHorizontally?: boolean;
       isCollidedVertically?: boolean;
     };
+    entityExtras.headYaw = this.yaw;
     entityExtras.isCollidedHorizontally = this.isCollidedHorizontally;
     entityExtras.isCollidedVertically = this.isCollidedVertically;
     return this;
