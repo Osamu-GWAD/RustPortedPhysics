@@ -90,6 +90,40 @@
             "airdrag": 1
         }
     },
+    "horses": {
+        "default": {
+            "defaultMovementSpeed": 0.225,
+            "defaultJumpStrength": 0.7,
+            "inputForwardScale": 0.98,
+            "inputStrafeScale": 0.49,
+            "inputBackwardScale": 0.25,
+            "forwardJumpImpulse": 0.4,
+            "honeyJumpFactor": 0.5,
+            "stepHeight": 1.0,
+            "gravity": 0.08,
+            "airborneInertia": 0.91,
+            "airborneAccelFactor": 0.1,
+            "liquidVerticalInertia": 0.8,
+            "waterHorizontalSlowDown": 0.8,
+            "liquidAccel": 0.02,
+            "groundFrictionMultiplier": 0.91,
+            "frictionInfluencedSpeedFactor": 0.21600002,
+            "defaultBlockFriction": 0.6,
+            "verticalDrag": 0.98,
+            "lavaShallowThreshold": 0.4,
+            "lavaHorizontalInertia": 0.5
+        },
+        "fallbackDimensions": {
+            "height": 1.6,
+            "width": 1.3964844
+        },
+        "speciesOverrides": {
+            "skeleton_horse": {
+                "waterHorizontalSlowDown": 0.96
+            }
+        },
+        "overrides": []
+    },
     "boats": {
         "default": {
             "gravity": 0.04,
