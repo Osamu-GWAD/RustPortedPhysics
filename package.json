@@ -61,7 +61,7 @@
         "@types/mocha": "^10.0.10",
         "@typescript-eslint/eslint-plugin": "^8.27.0",
         "@typescript-eslint/parser": "^8.27.0",
-        "eslint": "^9.23.0",
+        "eslint": "^10.10.0",
         "expect": "^29.7.0",
         "globals": "^16.0.0",
         "minecraft-data": "^3.109.0",
