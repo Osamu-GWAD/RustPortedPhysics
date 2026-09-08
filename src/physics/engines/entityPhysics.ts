@@ -17,6 +17,8 @@ import { EPhysicsCtx } from "../settings/entityPhysicsCtx";
 import { EntityState, IEntityState } from "../states";
 import { IPhysics } from "./IPhysics";
 import { PlayerState } from "../states";
+import { NativeCollisionWorkspace } from "../../native/collision";
+import { TickWorldCache } from "../../native/worldCache";
 
 type CheapEffectNames = keyof ReturnType<typeof getStatusEffectNamesForVersion>;
 type CheapEnchantmentNames = keyof ReturnType<typeof getEnchantmentNamesForVersion>;
@@ -32,6 +34,8 @@ export class EntityPhysics implements IPhysics {
   public movementSpeedAttribute: any;
   public supportFeature: ReturnType<typeof makeSupportFeature>;
   public blockSlipperiness: { [name: string]: number };
+  protected readonly nativeCollision = new NativeCollisionWorkspace();
+  protected readonly worldCache = new TickWorldCache<Block>();
 
   protected slimeBlockId: number;
   protected soulsandId: number;
@@ -224,22 +228,14 @@ export class EntityPhysics implements IPhysics {
 
     let playerBB = this.getEntityBB(entity, pos);
     const queryBB = playerBB.clone().extend(dx, dy, dz);
-    const surroundingBBs = this.getSurroundingBBs(queryBB, world);
     const oldBB = playerBB.clone();
 
-    for (const blockBB of surroundingBBs) {
-      dy = blockBB.computeOffsetY(playerBB, dy);
-    }
+    const resolvedMovement = this.nativeCollision.classicWorld(playerBB, dx, dy, dz, queryBB, world);
+    dy = resolvedMovement[1];
     playerBB.translate(0, dy, 0);
-
-    for (const blockBB of surroundingBBs) {
-      dx = blockBB.computeOffsetX(playerBB, dx);
-    }
+    dx = resolvedMovement[0];
     playerBB.translate(dx, 0, 0);
-
-    for (const blockBB of surroundingBBs) {
-      dz = blockBB.computeOffsetZ(playerBB, dz);
-    }
+    dz = resolvedMovement[2];
     playerBB.translate(0, 0, dz);
 
     // Step on block if height < stepHeight
@@ -717,6 +713,7 @@ export class EntityPhysics implements IPhysics {
   }
 
   simulate(entity: EPhysicsCtx, world: any /*prismarine-world*/): IEntityState {
+    world = this.worldCache.begin(world);
     if (!this.shouldMoveEntity(entity)) {
       entity.velocity.set(0, 0, 0);
       return entity.state;

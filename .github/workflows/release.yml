@@ -1,38 +1,138 @@
-# This workflow allows the maintainers to trigger a new release manually
 name: Release
 
 on:
   workflow_dispatch:
     inputs:
       version-type:
-        description: How major the changes are [ major | minor | patch | prerelease ]
+        description: How major the changes are [major | minor | patch | prerelease]
         required: true
         default: patch
 
+permissions:
+  contents: write
+  id-token: write
+
+env:
+  BINARY_NAME: mineflayer_physics_native
+
 jobs:
-  release:
-    name: GitHub and NPM Release
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      value: ${{ steps.next.outputs.value }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - id: next
+        shell: bash
+        run: |
+          CURRENT=$(node -p "require('./package.json').version")
+          npm install --global semver
+          NEXT=$(semver "$CURRENT" -i "${{ inputs['version-type'] }}" ${{ inputs['version-type'] == 'prerelease' && '--preid beta' || '' }})
+          echo "value=$NEXT" >> "$GITHUB_OUTPUT"
+
+  build-native:
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        settings:
+          - host: windows-latest
+            target: x86_64-pc-windows-msvc
+            args: ""
+          - host: windows-latest
+            target: aarch64-pc-windows-msvc
+            args: ""
+          - host: macos-latest
+            target: x86_64-apple-darwin
+            args: ""
+          - host: macos-latest
+            target: aarch64-apple-darwin
+            args: ""
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-gnu
+            args: --use-napi-cross
+          - host: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+            args: --use-napi-cross
+          - host: ubuntu-latest
+            target: x86_64-unknown-linux-musl
+            args: --cross-compile
+          - host: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-musl
+            args: --cross-compile
+    runs-on: ${{ matrix.settings.host }}
+    name: ${{ matrix.settings.target }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.settings.target }}
+      - uses: mlugg/setup-zig@v2
+        if: contains(matrix.settings.target, 'musl')
+        with:
+          version: 0.15.2
+      - uses: taiki-e/install-action@v2
+        if: contains(matrix.settings.target, 'musl')
+        with:
+          tool: cargo-zigbuild
+      - run: pnpm install --frozen-lockfile
+      - name: Build native addon
+        shell: bash
+        run: pnpm exec napi build --release --target ${{ matrix.settings.target }} --output-dir . --no-js ${{ matrix.settings.args }}
+      - uses: actions/upload-artifact@v7
+        with:
+          name: bindings-${{ matrix.settings.target }}
+          path: ${{ env.BINARY_NAME }}.*.node
+          if-no-files-found: error
+
+  publish:
+    needs: [version, build-native]
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v2
-      - uses: actions/setup-node@v2
+      - uses: actions/checkout@v7
+      - uses: pnpm/action-setup@v6
         with:
-          node-version: '22'
+          version: 11
+          run_install: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
           registry-url: https://registry.npmjs.org/
-          always-auth: true
-      - name: Install dependencies
-        run: yarn --dev
-      - name: Configure git credentials
-        uses: OleksiyRudenko/gha-git-credentials@v2
+      - run: pnpm install --frozen-lockfile
+      - name: Set package versions
+        run: npm version ${{ needs.version.outputs.value }} --no-git-tag-version
+      - name: Regenerate versioned loader and TypeScript output
+        run: pnpm build
+      - uses: actions/download-artifact@v8
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
-          name: ${{ github.actor }}
-          email: ${{ github.actor }}@users.noreply.github.com
-      - name: Release new version to NPM
-        run: yarn publish --non-interactive --access public --${{ github.event.inputs.version-type }} --preid beta --no-git-tag-version ${{ contains(github.event.inputs.version-type, 'pre') && '--tag beta' || '' }}
+          path: artifacts
+      - name: Place addons in platform packages
+        run: pnpm artifacts
+      - name: Publish root and platform packages
+        run: npm publish --access public ${{ inputs['version-type'] == 'prerelease' && '--tag beta' || '' }}
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
-      - name: Push to GitHub
+      - name: Commit release version and tag
+        shell: bash
         run: |
-          export VERSION=v$(node -pe "require('./package.json').version") &&
-          git add . && git commit -m "Release ${VERSION}" && git tag -m "" ${VERSION} && git push --follow-tags
+          VERSION=v${{ needs.version.outputs.value }}
+          git config user.name "${{ github.actor }}"
+          git config user.email "${{ github.actor }}@users.noreply.github.com"
+          git add package.json native/index.js native/index.d.ts npm
+          git commit -m "Release $VERSION"
+          git tag -a "$VERSION" -m "$VERSION"
+          git push --follow-tags

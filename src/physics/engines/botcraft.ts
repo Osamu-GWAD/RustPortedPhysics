@@ -18,6 +18,8 @@ import { IEntityState } from "../states";
 import { IPhysics } from "./IPhysics";
 import { PlayerPoses, PlayerState, convInpToAxes, getCollider } from "../states";
 import { PhysicsWorldSettings } from "../settings";
+import { NativeCollisionWorkspace } from "../../native/collision";
+import { TickWorldCache } from "../../native/worldCache";
 
 import type { world } from "prismarine-world"
 
@@ -55,6 +57,8 @@ export class BotcraftPhysics implements IPhysics {
   public stepHeightAttribute: string;
   public supportFeature: ReturnType<typeof makeSupportFeature>;
   public blockSlipperiness: { [name: string]: number };
+  protected readonly nativeCollision = new NativeCollisionWorkspace();
+  protected readonly worldCache = new TickWorldCache<Block>();
 
   protected bedId: number;
   protected slimeBlockId: number;
@@ -429,7 +433,7 @@ export class BotcraftPhysics implements IPhysics {
       const adjBlock = world.getBlock(block.position.offset(dx, 0, dz));
       const adjLevel = this.getRenderedDepth(adjBlock);
       if (adjLevel < 0) {
-        if (adjBlock && adjBlock.boundingBox === "empty") {
+        if (this.canFluidFlowThrough(adjBlock)) {
           const adjLevel = this.getRenderedDepth(world.getBlock(block.position.offset(dx, -1, dz)));
           if (adjLevel >= 0) {
             const f = adjLevel - (curlevel - 8);
@@ -464,6 +468,14 @@ export class BotcraftPhysics implements IPhysics {
     }
 
     return flow.normalize();
+  }
+
+  private canFluidFlowThrough(block: Block | null | undefined): boolean {
+    if (!block || block.boundingBox !== "empty") return false;
+    // Signs have no entity collision shape, but their block state still retains
+    // fluid. Treating the entity AABB as fluid occlusion makes raised AFK streams
+    // pull backward toward the lower channel.
+    return !block.name.includes("sign");
   }
 
   getLiquidHeightPcent(block: Block) {
@@ -1543,58 +1555,23 @@ export class BotcraftPhysics implements IPhysics {
 
   collideBoundingBox(world: World, bb: AABB, movement: Vec3, colliders: AABB[] = []): Vec3 {
     const queryBB = bb.expandTowards(movement);
-
-    const combinedColliders = [...colliders];
-
-    const blockCollisions = this.getSurroundingBBs(queryBB, world);
-    for (const block of blockCollisions) {
-      combinedColliders.push(block);
-    }
-
-    // console.log('queryBB', queryBB, combinedColliders.length)
-
-    return this.collideWithShapes(movement, bb, combinedColliders);
+    const resolved = this.nativeCollision.voxelWorld(
+      bb,
+      movement.x,
+      movement.y,
+      movement.z,
+      queryBB,
+      world,
+      colliders,
+    );
+    return new Vec3(resolved[0], resolved[1], resolved[2]);
   }
 
 
   private collideWithShapes(movement: Vec3, bb: AABB, colliders: AABB[] = []): Vec3 {
-    if (colliders.length === 0) {
-      return movement;
-    }
-
-    let dx = movement.x;
-    let dy = movement.y;
-    let dz = movement.z;
-
-    if (dy !== 0.0) {
-      dy = this.shapeCollide(1, bb, colliders, dy);
-      if (dy !== 0.0) {
-        bb = bb.moveCoords(0, dy, 0);
-      }
-    }
-
-    const prioritizeZ = Math.abs(dx) < Math.abs(dz);
-    if (prioritizeZ && dz !== 0.0) {
-      dz = this.shapeCollide(2, bb, colliders, dz);
-      if (dz !== 0.0) {
-        bb = bb.moveCoords(0, 0, dz);
-      }
-    }
-
-    if (dx !== 0.0) {
-      dx = this.shapeCollide(0, bb, colliders, dx);
-      if (!prioritizeZ && dx !== 0.0) {
-        bb = bb.moveCoords(dx, 0, 0);
-      }
-    }
-
-    if (!prioritizeZ && dz !== 0.0) {
-      dz = this.shapeCollide(2, bb, colliders, dz);
-    }
-
-    // console.log('shift', dx, dy, dz)
-
-    return new Vec3(dx, dy, dz);
+    if (colliders.length === 0) return movement;
+    const resolved = this.nativeCollision.voxel(bb, movement.x, movement.y, movement.z, colliders);
+    return new Vec3(resolved[0], resolved[1], resolved[2]);
   }
 
   shapeCollide(axis: number, bb: AABB, colliders: AABB[], movement: number): number {
@@ -1788,6 +1765,7 @@ export class BotcraftPhysics implements IPhysics {
   }
 
   simulate(entity: EPhysicsCtx, world: World): IEntityState {
+    world = this.worldCache.begin(world) as unknown as World;
     entity.state.attributes ??= {}
     this.physicsTick(entity, world);
     entity.state.age++;

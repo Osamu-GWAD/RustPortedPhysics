@@ -1,0 +1,24 @@
+[package]
+name = "mineflayer-physics-native"
+version = "0.1.0"
+edition = "2024"
+license = "GPL-3.0"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+path = "native-rs/lib.rs"
+
+[dependencies]
+napi = { version = "3.12.2", default-features = false, features = ["napi8"] }
+napi-derive = "3.4.0"
+
+[build-dependencies]
+napi-build = "2.4.1"
+
+[profile.release]
+codegen-units = 1
+lto = "fat"
+opt-level = 3
+panic = "abort"
+strip = "symbols"

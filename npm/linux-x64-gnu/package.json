@@ -1,0 +1,36 @@
+{
+  "name": "@nxg-org/mineflayer-physics-util-linux-x64-gnu",
+  "version": "1.9.10",
+  "cpu": [
+    "x64"
+  ],
+  "main": "mineflayer_physics_native.linux-x64-gnu.node",
+  "files": [
+    "mineflayer_physics_native.linux-x64-gnu.node"
+  ],
+  "description": "Provides functionality for more accurate entity and projectile tracking.",
+  "keywords": [
+    "mineflayer",
+    "mineflayer-plugin",
+    "mineflayer-tracker"
+  ],
+  "author": "generel_schwerz",
+  "license": "GPL-3.0",
+  "engines": {
+    "node": ">=16"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/nxg-org/mineflayer-physics-utils.git"
+  },
+  "publishConfig": {
+    "registry": "https://registry.npmjs.org/",
+    "access": "public"
+  },
+  "os": [
+    "linux"
+  ],
+  "libc": [
+    "glibc"
+  ]
+}

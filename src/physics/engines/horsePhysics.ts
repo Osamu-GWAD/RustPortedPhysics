@@ -31,6 +31,8 @@ export class HorsePhysics extends EntityPhysics {
       return super.simulate(simCtx, world);
     }
 
+    world = this.worldCache.begin(world);
+
     const state = simCtx.state;
     if (!this.isWorldReady(simCtx, state, world)) {
       state.worldReady = false;
